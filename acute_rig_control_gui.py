@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 from tkinter import *
 from tkinter import messagebox
+from tkinter.filedialog import askdirectory
 import os
 import threading
 import sys
 import socket
+import json
 from time import sleep
 import zmq
 import time
@@ -22,7 +24,7 @@ from serial_commander import conex_interface as sc
 #################################
 ## ACUTE RIG CONTROL GUI!      ##
 ## Brad Theilman 2018          ##
-## With code from Zeke Arneodo ##
+## With code from Zeke Arneodo  & MET >:)##
 #################################
 
 
@@ -103,15 +105,19 @@ class OpenEphysEvents:
             print('OK to start')
 
         if ok_to_start:
-            rec_opt = ['{0}={1}'.format(key, value)
-                       for key, value in rec_par.items()
-                       if value is not None]
+            for key in rec_par.keys():
+                #if key == 'RecDir':
+                #    rec_par[key] = '\''+rec_par[key]+'\''
+                    rec_opt = ['{0}={1}'.format(key, value)
+                    for key, value in rec_par.items()
+                    if value is not None]
             self.send_command(' '.join(['StartRecord'] + rec_opt))
+            print(' '.join(['StartRecord'] + rec_opt))
             if self.query_status('Recording'):
                 print('Recording path: {}'.format(self.get_rec_path()))
                 ok_started = True
             else:
-                print('Something went wrong starting recording')
+                print('Something went wrong... starting recording')
         else:
             print('Did not start recording')
         return ok_started
@@ -122,7 +128,7 @@ class OpenEphysEvents:
             if not self.query_status('Recording'):
                 print('Recording stopped')
             else:
-                print('Something went wrong stopping recording')
+                print('Something went wrong! Stopping recording')
         else:
             print('Was not recording')
 
@@ -329,7 +335,7 @@ class AcuteExperimentControl:
         self.Z = 0
         self.probe = 'A1x16'
 
-        # Stimulu information
+        # Stimulus information
         self.stim_dir = os.path.expanduser('~/stimuli/')
 
         # Trial information
@@ -434,7 +440,7 @@ class AcuteExperimentControl:
         self.load_stimulus_button = Button(self.paths_frame, text='Load Stimuli', command=self.load_stimuli)
         self.experiment_path_label = Label(self.paths_frame, text='Experiment Dir')
         self.experiment_path_entry = Entry(self.paths_frame)
-        self.stimulus_path_label = Label(self.paths_frame, text='Stimulus Dir')
+        self.stimulus_path_label = Button(self.paths_frame, text='Set Stimulus Dir', command=self.set_stimulus_directory)
         self.stimulus_path_entry = Entry(self.paths_frame)
         self.session_label = Label(self.paths_frame, text='Session ID')
         self.session_entry = Entry(self.paths_frame)
@@ -473,11 +479,13 @@ class AcuteExperimentControl:
         self.block_status_frame.grid(row=3, column=4, columnspan=4, rowspan=1, padx=5, pady=5, sticky=N+S+E+W)
 
         # Logo
-        image = Image.open("glab.png").resize(size=(256, 64), resample=Image.BICUBIC)
-        self.logo = ImageTk.PhotoImage(image)
-        self.logo_label = Label(image=self.logo)
-        self.logo_label.grid(row=0, column=4, columnspan=4, rowspan=2, pady=15, padx=10, sticky=N+S)
-
+        try:
+        	image = Image.open("glab.png").resize(size=(256, 64), resample=Image.BICUBIC)
+        	self.logo = ImageTk.PhotoImage(image)
+        	self.logo_label = Label(image=self.logo)
+        	self.logo_label.grid(row=0, column=4, columnspan=4, rowspan=2, pady=15, padx=10, sticky=N+S)
+        except:
+        	pass
         # Author
         #Label(self.master_window, text="Brad Theilman").grid(row=11, column=4 )
 
@@ -486,6 +494,11 @@ class AcuteExperimentControl:
     def open_conex(self):
         self.conex_window = Toplevel(self.master_window)
         self.conex_app = CONEXControl(self)
+
+    def set_stimulus_directory(self):
+    	self.stim_dir = os.path.join(askdirectory(title='Select stimulus folder', initialdir="~/stimuli"))
+    	self.stimulus_path_entry.delete(1, END)
+    	self.stimulus_path_entry.insert(0, self.stim_dir)
 
     def start_button_cmd(self):
         self.lock_params()
@@ -696,6 +709,9 @@ class AcuteExperimentControl:
             if self.inter_trial_type == 'fixed':
                 min_dur = stimdur + self.n_repeats*self.inter_trial_fixed*len(self.stimuli)
                 max_dur = min_dur
+        else:
+        	min_dur = 0
+        	max_dur = 0
         return (min_dur, max_dur)
                
     def setup_block_name(self, search_or_block):
@@ -703,20 +719,34 @@ class AcuteExperimentControl:
         self.block_name = datetime.datetime.now().strftime('%Y%m%d%H%M') + '-' + self.bird + '-' + '{}-{}-'.format(search_or_block, self.blocknum) + \
                 'AP-%.0f-' % self.AP + 'ML-%.0f-' % self.ML + 'Z-%.0f' % self.Z
                 
-        self.block_path = os.path.join(self.blocks_path, self.block_name)
+        self.block_path = os.path.join(self.session_path, self.block_name)
         os.makedirs(self.block_path, exist_ok=False)
         self.save_block_parameters(self.block_path)
 
     def save_block_parameters(self, path):
-        pass
+        log_info = {}
+        log_info['birdID'] = self.bird
+        log_info['probetype'] = self.probe
+        log_info['stimuli_folder'] = self.stim_dir
+        log_info['start_time'] = datetime.datetime.now().strftime('%Y%M%D')
+        log_info['repeats'] = self.n_repeats
+        log_info['block_path'] = self.block_path
+        log_info['ap'] = self.AP
+        log_info['ml'] = self.ML
+        log_info['z'] = self.Z
+        log_info['rig'] = socket.gethostname()
+
+        log_file_name = os.path.join(self.block_path, "block_log_file.json")
+
+        with open(log_file_name, 'w') as outfile:
+        	json.dump(log_info, outfile)
 
     def setup_session(self):
         
-        self.sessionID = datetime.datetime.now().strftime('%Y%m%d') + '-' +socket.gethostname()
+        self.sessionID = datetime.datetime.now().strftime('%Y%m%d') + '-' + socket.gethostname() + '-' + self.bird_entry.get()
         self.session_path=os.path.join(self.experiment_path_entry.get(), self.sessionID)
         self.bird_path = os.path.join(self.session_path, self.bird)
-        self.blocks_path = os.path.join(self.bird_path, 'blocks')
-        os.makedirs(self.blocks_path, exist_ok=True)
+        os.makedirs(self.session_path, exist_ok=True)
 
         self.session_entry.delete(0, END)
         self.session_entry.insert(0, self.sessionID)
