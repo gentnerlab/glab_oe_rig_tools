@@ -242,12 +242,12 @@ class CONEXControl:
        self.master.bind("<Key>", self.process_key)
        self.master.aspect(1, 1, 1, 1)
        self.buttonframe = Frame(self.master, bd=2)
-       self.down5 = Button(self.buttonframe, text="Down 5um",command=lambda : self.move_stage(5))
-       self.down25 = Button(self.buttonframe, text="Down 25um",command=lambda : self.move_stage(25))
-       self.down50 = Button(self.buttonframe, text="Down 50um",command=lambda : self.move_stage(50))
-       self.up25 = Button(self.buttonframe, text="Up 25um",command=lambda : self.move_stage(-25))
-       self.up50 = Button(self.buttonframe, text="Up 50um",command=lambda : self.move_stage(-50))
-       self.up100 = Button(self.buttonframe, text="Up 100um",command=lambda : self.move_stage(-100))
+       self.down5 = Button(self.buttonframe, text="Down 5um",command=lambda : self.move_stage(-5))
+       self.down25 = Button(self.buttonframe, text="Down 25um",command=lambda : self.move_stage(-25))
+       self.down50 = Button(self.buttonframe, text="Down 50um",command=lambda : self.move_stage(-50))
+       self.up25 = Button(self.buttonframe, text="Up 25um",command=lambda : self.move_stage(25))
+       self.up50 = Button(self.buttonframe, text="Up 50um",command=lambda : self.move_stage(50))
+       self.up100 = Button(self.buttonframe, text="Up 100um",command=lambda : self.move_stage(100))
        self.disableB = Button(self.buttonframe, text="Disable", command=self.disable)
        self.gohome = Button(self.buttonframe, text="Go Home", command=self.rethome)
        self.resetHomeB = Button(self.buttonframe, text="Reset Home", command=self.resetHomeValue)
@@ -744,12 +744,16 @@ class AcuteExperimentControl:
     def setup_session(self):
         
         self.sessionID = datetime.datetime.now().strftime('%Y%m%d') + '-' + socket.gethostname() + '-' + self.bird_entry.get()
-        self.session_path=os.path.join(self.experiment_path_entry.get(), self.sessionID)
-        self.bird_path = os.path.join(self.session_path, self.bird)
-        os.makedirs(self.session_path, exist_ok=True)
+        if os.path.exists(self.experiment_path_entry):
+            self.session_path=os.path.join(self.experiment_path_entry.get(), self.sessionID)
+            self.bird_path = os.path.join(self.session_path, self.bird)
+            os.makedirs(self.session_path, exist_ok=True)
 
-        self.session_entry.delete(0, END)
-        self.session_entry.insert(0, self.sessionID)
+            self.session_entry.delete(0, END)
+            self.session_entry.insert(0, self.sessionID)
+
+        else:
+            print("experiment directory does not exist")
 
     def copy_stimuli(self):
         # Copies stimuli over to raspi via ssh
