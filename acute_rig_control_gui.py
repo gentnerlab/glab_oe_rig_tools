@@ -744,7 +744,7 @@ class AcuteExperimentControl:
     def setup_session(self):
         
         self.sessionID = datetime.datetime.now().strftime('%Y%m%d') + '-' + socket.gethostname() + '-' + self.bird_entry.get()
-        if os.path.exists(self.experiment_path_entry):
+        if os.path.exists(self.experiment_path_entry.get()):
             self.session_path=os.path.join(self.experiment_path_entry.get(), self.sessionID)
             self.bird_path = os.path.join(self.session_path, self.bird)
             os.makedirs(self.session_path, exist_ok=True)
@@ -753,7 +753,7 @@ class AcuteExperimentControl:
             self.session_entry.insert(0, self.sessionID)
 
         else:
-            print("experiment directory does not exist")
+            messagebox.showerror("Error","Experiment directory does not exist. Not setting up session. Please ensure the directory exists on the correct drive.")
 
     def copy_stimuli(self):
         # Copies stimuli over to raspi via ssh
